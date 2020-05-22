@@ -125,7 +125,8 @@ package main
 
             sqlStr,sqlParam,err:= m.selectSql(param)
             if len(err) > 0{
-                fmt.Fprint(w, err)
+                h.Message = err
+                io.WriteString(w, h.failure())
                 return
             }
             rows, _:= DB.Query(sqlStr,sqlParam ...)
@@ -139,12 +140,14 @@ package main
             h.Data = datas          
             io.WriteString(w, h.success())
 
+
             
         }else if r == RSelectRow{
 
             sqlStr,sqlParam,err:= m.selectRowSql(param)
             if len(err) > 0{
-                fmt.Fprint(w, err)
+                h.Message = err
+                io.WriteString(w, h.failure())
                 return
             }
             row := DB.QueryRow(sqlStr,sqlParam ...)
@@ -152,34 +155,36 @@ package main
             fmt.Println(data)
 
             h.Data = data
-            fmt.Fprint(w, h.success())
+            io.WriteString(w, h.success())
 
 
         }else if r == RInsert {
             
             sqlStr,sqlParam,err:= m.insertSql(param)
             if len(err) > 0{
-                fmt.Fprint(w, err)
+                h.Message = err
+                io.WriteString(w, h.failure())
                 return
             }
             result, _:= DB.Exec(sqlStr,sqlParam ...)
             fmt.Println(result)
 
             h.Data = result
-            fmt.Fprint(w, h.success())
+            io.WriteString(w, h.success())
 
 
         }else if r == RUpdate {
 
             sqlStr,sqlParam,err:= m.updateSql(param)
             if len(err) > 0{
-                fmt.Fprint(w, err)
+                h.Message = err
+                io.WriteString(w, h.failure())
                 return
             }
             result, _:= DB.Exec(sqlStr,sqlParam ...)
             fmt.Println(result)
             h.Data = result
-            fmt.Fprint(w, h.success())
+            io.WriteString(w, h.success())
 
             
         }else if r == RDelete {
@@ -187,13 +192,14 @@ package main
 
             sqlStr,sqlParam,err:= m.deleteSql(param)
             if len(err) > 0{
-                fmt.Fprint(w, err)
+                h.Message = err
+                io.WriteString(w, h.failure())
                 return
             }
             result, _:= DB.Exec(sqlStr,sqlParam ...)
             fmt.Println(result)
             h.Data = result
-            fmt.Fprint(w, h.success())
+            io.WriteString(w, h.success())
 
             
         }
