@@ -5,7 +5,7 @@ package main
         "net/http"
         "strings"
         "log"
-        _ "github.com/go-sql-driver/mysql"
+        _"github.com/go-sql-driver/mysql"
         "database/sql"
         "reflect"
         "encoding/json"
@@ -58,6 +58,7 @@ package main
 
         http.Handle("/b",Controller{b:Book{},r:RSelect})
         http.Handle("/p",Controller{b:Pen{},r:RSelect})
+       
 
     }
     type DataInterface interface{
@@ -70,6 +71,16 @@ package main
         selectRows(rows *sql.Rows) interface{}
         selectRow(row *sql.Row) interface{}
 
+    }
+
+    func AController(w http.ResponseWriter, r *http.Request){
+
+        r.ParseForm()  
+        form := make(map[string]string)
+        for k, v := range r.Form {
+            form[k] = strings.Join(v,"")
+        }
+        fmt.Println(form)
     }
 
     
@@ -87,7 +98,7 @@ package main
         }
         fmt.Println(form)
 
-
+        
         serveHttps(c.b,c.r ,form,w)
 
         
