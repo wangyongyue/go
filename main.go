@@ -8,9 +8,7 @@ package main
         _"github.com/go-sql-driver/mysql"
         "database/sql"
         "reflect"
-        "encoding/json"
-        "io"
-    
+        "encoding/json"    
 
     )
     //数据库配置
@@ -21,15 +19,7 @@ package main
         port = "3306"
         dbName = "vsk"
     )
-    type RequestType int32
-
-    const (
-        RSelect     RequestType = 0
-        RSelectRow  RequestType = 1
-        RInsert     RequestType = 2
-        RUpdate     RequestType = 3
-        RDelete     RequestType = 4
-    )
+    
 
     var DB *sql.DB
     func main() {
@@ -56,8 +46,8 @@ package main
     }
     func registerUrls(){
 
-        http.Handle("/b",Controller{b:Book{},r:RSelect})
-        http.Handle("/p",Controller{b:Pen{},r:RSelect})
+        http.Handle("/b",SelectController{b:Book{}})
+        http.Handle("/p",SelectController{b:Pen{}})
        
 
     }
@@ -73,23 +63,14 @@ package main
 
     }
 
-    func AController(w http.ResponseWriter, r *http.Request){
-
-        r.ParseForm()  
-        form := make(map[string]string)
-        for k, v := range r.Form {
-            form[k] = strings.Join(v,"")
-        }
-        fmt.Println(form)
-    }
-
     
-    type Controller struct{
+    type SelectController struct{
         b DataInterface
-        r RequestType
 
     }
-    func (c Controller) ServeHTTP(w http.ResponseWriter, r *http.Request){
+    func (c SelectController) ServeHTTP(w http.ResponseWriter, r *http.Request){
+
+        w.Header().Set("content-type","text/json")
 
         r.ParseForm()  
         form := make(map[string]string)
@@ -97,13 +78,12 @@ package main
             form[k] = strings.Join(v,"")
         }
         fmt.Println(form)
-
-        
-        serveHttps(c.b,c.r ,form,w)
-
-        
+        h := selectRequest(c.b,form)
+        ret_json, _ := json.Marshal(h)
+        w.Write(ret_json)
 
     }
+
 
     type HttpResult struct{
 
@@ -113,136 +93,94 @@ package main
 
     }
    
-    func (h HttpResult) success() string{
+    func (h HttpResult) success() HttpResult{
 
        h.Code = 1
        h.Message = "success"
-       ret_json, _ := json.Marshal(h)
-       fmt.Println(string(ret_json))
-       return string(ret_json)
+       return h
     }
-    func (h HttpResult) failure() string{
+    func (h HttpResult) failure() HttpResult{
        h.Code = 100
        h.Data = nil
-       ret_json, _ := json.Marshal(h)
-       fmt.Println(string(ret_json))
-       return string(ret_json)
+       return h
     }
 
-    func serveHttps(m DataInterface,r RequestType,param map[string]string,w http.ResponseWriter) {
+    func selectRequest(m DataInterface,param map[string]string) HttpResult{
+
+    	h :=  HttpResult{}
+    	sqlStr,sqlParam,err:= m.selectSql(param)
+        if len(err) > 0{
+            h.Message = err
+            return h.failure()
+        }
+        rows, _:= DB.Query(sqlStr,sqlParam ...)
+        datas := make([]interface{}, 0)
+        for rows.Next(){
+            fmt.Println(reflect.TypeOf(rows)) 
+            data := m.selectRows(rows)
+            datas = append(datas,data)
+        }
+        fmt.Println(datas)
+        h.Data = datas   
+        return h.success()       
+
+    }
+    func selectRowRequest(m DataInterface,param map[string]string) HttpResult{
 
         h :=  HttpResult{}
-        if r  == RSelect {
-
-            sqlStr,sqlParam,err:= m.selectSql(param)
-            if len(err) > 0{
-                h.Message = err
-                io.WriteString(w, h.failure())
-                return
-            }
-            rows, _:= DB.Query(sqlStr,sqlParam ...)
-            datas := make([]interface{}, 0)
-            for rows.Next(){
-                fmt.Println(reflect.TypeOf(rows)) 
-                data := m.selectRows(rows)
-                datas = append(datas,data)
-            }
-            fmt.Println(datas)
-            h.Data = datas          
-            io.WriteString(w, h.success())
-
-
-            
-        }else if r == RSelectRow{
-
-            sqlStr,sqlParam,err:= m.selectRowSql(param)
-            if len(err) > 0{
-                h.Message = err
-                io.WriteString(w, h.failure())
-                return
-            }
-            row := DB.QueryRow(sqlStr,sqlParam ...)
-            data := m.selectRow(row)
-            fmt.Println(data)
-
-            h.Data = data
-            io.WriteString(w, h.success())
-
-
-        }else if r == RInsert {
-            
-            sqlStr,sqlParam,err:= m.insertSql(param)
-            if len(err) > 0{
-                h.Message = err
-                io.WriteString(w, h.failure())
-                return
-            }
-            result, _:= DB.Exec(sqlStr,sqlParam ...)
-            fmt.Println(result)
-
-            h.Data = result
-            io.WriteString(w, h.success())
-
-
-        }else if r == RUpdate {
-
-            sqlStr,sqlParam,err:= m.updateSql(param)
-            if len(err) > 0{
-                h.Message = err
-                io.WriteString(w, h.failure())
-                return
-            }
-            result, _:= DB.Exec(sqlStr,sqlParam ...)
-            fmt.Println(result)
-            h.Data = result
-            io.WriteString(w, h.success())
-
-            
-        }else if r == RDelete {
-
-
-            sqlStr,sqlParam,err:= m.deleteSql(param)
-            if len(err) > 0{
-                h.Message = err
-                io.WriteString(w, h.failure())
-                return
-            }
-            result, _:= DB.Exec(sqlStr,sqlParam ...)
-            fmt.Println(result)
-            h.Data = result
-            io.WriteString(w, h.success())
-
-            
+        sqlStr,sqlParam,err:= m.selectRowSql(param)
+        if len(err) > 0{
+            h.Message = err
+            return h.failure()
         }
+        row := DB.QueryRow(sqlStr,sqlParam ...)
+        data := m.selectRow(row)
+        fmt.Println(data)
+        h.Data = data
+        return h.success()       
 
+    }
+    func insertRequest(m DataInterface,param map[string]string) HttpResult{
 
+        h :=  HttpResult{}
+        sqlStr,sqlParam,err:= m.insertSql(param)
+        if len(err) > 0{
+            h.Message = err
+            return h.failure()
+        }
+        result, _:= DB.Exec(sqlStr,sqlParam ...)
+        fmt.Println(result)
+        h.Data = result
+        return h.success()       
 
-
-
-
-        
     }
 
+    func updateRequest(m DataInterface,param map[string]string) HttpResult{
 
+        h :=  HttpResult{}
+        sqlStr,sqlParam,err:= m.updateSql(param)
+        if len(err) > 0{
+            h.Message = err
+            return h.failure()
+        }
+        result, _:= DB.Exec(sqlStr,sqlParam ...)
+        fmt.Println(result)
+        h.Data = result
+        return h.success()       
 
+    }
 
+    func deleteRequest(m DataInterface,param map[string]string) HttpResult{
 
+        h :=  HttpResult{}
+        sqlStr,sqlParam,err:= m.deleteSql(param)
+        if len(err) > 0{
+            h.Message = err
+            return h.failure()
+        }
+        result, _:= DB.Exec(sqlStr,sqlParam ...)
+        fmt.Println(result)
+        h.Data = result
+        return h.success()       
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
+    }
